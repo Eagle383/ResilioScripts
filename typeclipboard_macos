@@ -1,0 +1,8 @@
+-- Wait for 2 seconds
+delay 2
+
+-- Type the content of the clipboard
+tell application "System Events"
+    set theClipboard to the clipboard
+    keystroke theClipboard
+end tell
