@@ -1,5 +1,18 @@
 #!/bin/bash
 
+# Function to check and install missing prerequisites
+check_and_install() {
+    if ! command -v $1 &> /dev/null; then
+        echo "$1 could not be found, attempting to install..."
+        sudo apt-get update
+        sudo apt-get install -y $1
+    fi
+}
+
+# Check for curl and jq, install if they're missing
+check_and_install curl
+check_and_install jq
+
 # Prompt user for Management Console host and API token
 read -p "Please enter the Management Console host (including https:// and port): " MCHost
 read -p "Please enter your API token: " APIToken
