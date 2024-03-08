@@ -19,12 +19,6 @@ while ($jobTypeSelection -lt 1 -or $jobTypeSelection -gt $jobTypes.Length) {
 }
 $jobType = $jobTypes[$jobTypeSelection - 1]
 
-$syncPermissions = Read-Host "Do you want to sync permissions? (yes/no)"
-$referenceAgentId = $null
-if ($syncPermissions -eq 'yes') {
-    $agentNameForPermission = Read-Host "Please enter the agent's name for syncing permissions"
-}
-
 $agentNamesInput = Read-Host "Please enter the agent names separated by commas"
 
 # Parse agent names
@@ -39,14 +33,6 @@ $http_headers = @{
 # Fetch the list of agents from the API
 try {
     $agent_list = Invoke-RestMethod -Method GET -uri "$base_url/agents" -Headers $http_headers -ContentType "Application/json"
-    if ($syncPermissions -eq 'yes') {
-        $referenceAgent = $agent_list | Where-Object { $_.name -eq $agentNameForPermission }
-        if ($referenceAgent) {
-            $referenceAgentId = $referenceAgent.id
-        } else {
-            Write-Host "Agent for permission syncing not found. Proceeding without reference_agent_id."
-        }
-    }
 } catch {
     Write-Host "Error fetching agents: $_"
     exit
@@ -58,32 +44,23 @@ foreach ($agentName in $agentNames) {
     $agent = $agent_list | Where-Object { $_.name -eq $agentName }
     if ($agent) {
         Write-Host "Agent: $($agent.name) - OS: $($agent.os)"
-        
-        # Initialize default empty paths
-        $linuxPath = ""
-        $windowsPath = ""
-        $macPath = ""
+        $linuxPath = $null
+        $windowsPath = $null
+        $macPath = $null
 
-        # Prompt for the path based on detected OS
-        switch ($agent.os) {
-            {$_ -like "*win*"} {
-                $windowsPath = Read-Host "Please enter the Windows sync path for $($agent.name)"
-                break
-            }
-            {$_ -like "*linux*"} {
-                $linuxPath = Read-Host "Please enter the Linux sync path for $($agent.name)"
-                break
-            }
-            {$_ -like "*mac*" -or $_ -like "*osx*"} {
-                $macPath = Read-Host "Please enter the macOS sync path for $($agent.name)"
-                break
-            }
+        # Check the OS and prompt for the corresponding path
+        if ($agent.os -like "*win*") {
+            $windowsPath = Read-Host "Please enter the Windows sync path for $($agent.name)"
+        } elseif ($agent.os -like "*linux*") {
+            $linuxPath = Read-Host "Please enter the Linux sync path for $($agent.name)"
+        } elseif ($agent.os -like "*mac*" -or $agent.os -like "*osx*") {
+            $macPath = Read-Host "Please enter the macOS sync path for $($agent.name)"
         }
 
         $selectedAgents += [PSCustomObject]@{
             id = $agent.id
             permission = "rw"
-            path = [PSCustomObject]@{
+            path = @{
                 linux = $linuxPath
                 win = $windowsPath
                 osx = $macPath
@@ -95,19 +72,16 @@ foreach ($agentName in $agentNames) {
 }
 
 # Build the JobObject with user-specified paths
-$settingsObject = @{
-    use_ram_optimization = $true
-}
-if ($null -ne $referenceAgentId) {
-    $settingsObject["reference_agent_id"] = $referenceAgentId
-}
 $JobObject = [PSCustomObject]@{
     name        = $jobName
     description = $jobDescription
     type        = $jobType
-    settings    = $settingsObject
-    profile_id  = 2
-    agents      = $selectedAgents
+    settings    = @{
+        use_ram_optimization = $true
+        reference_agent_id   = 400 # This should be dynamically set or verified
+    }
+    profile_id = 2
+    agents     = $selectedAgents
 }
 
 # Convert JobObject to JSON
