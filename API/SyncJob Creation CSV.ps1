@@ -1,6 +1,6 @@
 Add-Type -AssemblyName System.Windows.Forms
 
-# Create and configure OpenFileDialog
+# Configure OpenFileDialog
 $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
 $openFileDialog.initialDirectory = [Environment]::GetFolderPath("Desktop")
 $openFileDialog.filter = "CSV files (*.csv)|*.csv"
@@ -13,22 +13,17 @@ if (-not [string]::IsNullOrWhiteSpace($csvPath)) {
     # Prompt user for Management Console host and API token
     $MCHost = Read-Host "Please enter the Management Console host (including https:// and port)"
     $APIToken = Read-Host "Please enter your API token"
-
+    
     # Define job types and prompt user to select one
-    $jobTypes = @("distribution", "consolidation", "script", "sync")
+    $jobTypes = @("distribution", "consolidation", "sync") | Sort-Object
     Write-Host "Select the job type by entering the corresponding number:"
-    for ($i = 0; $i -lt $jobTypes.Length; $i++) {
-        Write-Host "$($i + 1): $($jobTypes[$i])"
-    }
-    $jobTypeSelection = Read-Host "Enter number (1-4)"
+    $jobTypes.ForEach({ $index = [Array]::IndexOf($jobTypes, $_) + 1; Write-Host "$index: $_" })
+    $jobTypeSelection = Read-Host "Enter number"
     while ($jobTypeSelection -lt 1 -or $jobTypeSelection -gt $jobTypes.Length) {
-        Write-Host "Invalid selection. Please enter a number between 1 and 4."
-        $jobTypeSelection = Read-Host "Enter number (1-4)"
+        Write-Host "Invalid selection. Please enter a number between 1 and ${jobTypes.Length}."
+        $jobTypeSelection = Read-Host "Enter number"
     }
     $jobType = $jobTypes[$jobTypeSelection - 1]
-
-    # Import the job entries from the selected CSV file
-    $jobEntries = Import-Csv $csvPath
 
     # Define base URL and headers for API requests using "Token" for authorization
     $base_url = "$MCHost/api/v2"
@@ -37,36 +32,24 @@ if (-not [string]::IsNullOrWhiteSpace($csvPath)) {
     }
 
     # Fetch the list of all agents from the API
-    try {
-        $agent_list = Invoke-RestMethod -Method GET -uri "$base_url/agents" -Headers $http_headers -ContentType "Application/json"
-    } catch {
-        Write-Host "Error fetching agents: $_"
-        exit
-    }
+    $agent_list = Invoke-RestMethod -Method GET -uri "$base_url/agents" -Headers $http_headers -ContentType "Application/json"
 
+    $jobEntries = Import-Csv $csvPath
     $uniqueJobNames = $jobEntries | Select-Object -ExpandProperty JobName -Unique
 
     foreach ($jobName in $uniqueJobNames) {
         $currentJobEntries = $jobEntries | Where-Object { $_.JobName -eq $jobName }
-        $jobDescription = $currentJobEntries[0].JobDescription  # Assuming description is consistent
+        $jobDescription = $currentJobEntries[0].JobDescription
 
         $selectedAgents = @()
-
         foreach ($entry in $currentJobEntries) {
             $agentName = $entry.AgentNames
             $agent = $agent_list | Where-Object { $_.name -eq $agentName }
 
             if ($agent) {
-                # Initialize and assign paths
                 $linuxPath = ""
-                $windowsPath = ""
+                $windowsPath = $entry.winPath
                 $macPath = ""
-
-                switch ($agent.os) {
-                    {$_ -like "*win*"} { $windowsPath = $entry.winPath }
-                    {$_ -like "*linux*"} { $linuxPath = $entry.linuxPath }
-                    {$_ -like "*mac*" -or $_ -like "*osx*"} { $macPath = $entry.osxPath }
-                }
 
                 $selectedAgents += [PSCustomObject]@{
                     id = $agent.id
@@ -83,21 +66,22 @@ if (-not [string]::IsNullOrWhiteSpace($csvPath)) {
         }
 
         $JobObject = [PSCustomObject]@{
-            name        = $jobName
+            name = $jobName
             description = $jobDescription
-            type        = $jobType
-            settings    = @{ use_ram_optimization = $true }
-            profile_id  = 2
-            agents      = $selectedAgents
+            type = $jobType
+            settings = @{ use_ram_optimization = $true }
+            profile_id = 2
+            agents = $selectedAgents
         }
 
         $JSON = $JobObject | ConvertTo-Json -Depth 10
-        Write-Output $JSON
 
+        # Invoke job creation API call
         try {
-            Invoke-RestMethod -Method "POST" -Uri "$base_url/jobs" -Headers $http_headers -ContentType "Application/json" -Body $JSON
+            $response = Invoke-RestMethod -Method "POST" -Uri "$base_url/jobs" -Headers $http_headers -ContentType "Application/json" -Body $JSON
+            Write-Host "Job '$jobName' created successfully."
         } catch {
-            Write-Host "Error creating job: $_"
+            Write-Host "Error creating job '$jobName': $_"
         }
     }
 } else {
