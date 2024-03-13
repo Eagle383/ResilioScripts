@@ -2,8 +2,8 @@ Add-Type -AssemblyName System.Windows.Forms
 
 # Configure OpenFileDialog
 $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
-$openFileDialog.initialDirectory = [Environment]::GetFolderPath("Desktop")
-$openFileDialog.filter = "CSV files (*.csv)|*.csv"
+$openFileDialog.InitialDirectory = [Environment]::GetFolderPath("Desktop")
+$openFileDialog.Filter = "CSV files (*.csv)|*.csv"
 $openFileDialog.ShowDialog() | Out-Null
 
 # Get the selected CSV file path
@@ -17,11 +17,14 @@ if (-not [string]::IsNullOrWhiteSpace($csvPath)) {
     # Define job types and prompt user to select one
     $jobTypes = @("distribution", "consolidation", "sync") | Sort-Object
     Write-Host "Select the job type by entering the corresponding number:"
-    $jobTypes.ForEach({ $index = [Array]::IndexOf($jobTypes, $_) + 1; Write-Host "$index: $_" })
-    $jobTypeSelection = Read-Host "Enter number"
+    $jobTypes.ForEach({
+        $index = [Array]::IndexOf($jobTypes, $_) + 1
+        Write-Host "${index}: $_"
+    })
+    [int]$jobTypeSelection = Read-Host "Enter number"
     while ($jobTypeSelection -lt 1 -or $jobTypeSelection -gt $jobTypes.Length) {
-        Write-Host "Invalid selection. Please enter a number between 1 and ${jobTypes.Length}."
-        $jobTypeSelection = Read-Host "Enter number"
+        Write-Host "Invalid selection. Please enter a number between 1 and $($jobTypes.Length)."
+        [int]$jobTypeSelection = Read-Host "Enter number"
     }
     $jobType = $jobTypes[$jobTypeSelection - 1]
 
@@ -79,9 +82,12 @@ if (-not [string]::IsNullOrWhiteSpace($csvPath)) {
         # Invoke job creation API call
         try {
             $response = Invoke-RestMethod -Method "POST" -Uri "$base_url/jobs" -Headers $http_headers -ContentType "Application/json" -Body $JSON
-            Write-Host "Job '$jobName' created successfully."
+            $responseJson = $response | ConvertTo-Json -Depth 10
+            $responsePath = "C:\Users\eagle\OneDrive\Documents\GitHub\ResilioScripts\API\$($jobName).json"
+            $responseJson | Out-File -FilePath $responsePath -Force
+            Write-Host "Job '$jobName' created successfully. Response saved to $responsePath"
         } catch {
-            Write-Host "Error creating job '$jobName': $_"
+            Write-Host "Error creating job '$jobName': $($_.Exception.Message)"
         }
     }
 } else {
