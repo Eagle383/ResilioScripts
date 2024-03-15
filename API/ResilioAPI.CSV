@@ -1,7 +1,0 @@
-JobName,JobDescription,AgentNames,winPath,linuxPath,osxPath
-Job 1,Description for Job 1,DESKTOP-PIS4UUO,C:\tmp\job1,,
-Job 1,Description for Job 1,BLUEIRIS,C:\tmp\job1,,
-Job 2,Description for Job 2,DESKTOP-PIS4UUO,C:\tmp\job2,,
-Job 2,Description for Job 2,BLUEIRIS,C:\tmp\job2,,
-Job 3,Description for Job 3,DESKTOP-PIS4UUO,C:\tmp\job3,,
-Job 3,Description for Job 3,BLUEIRIS,C:\tmp\job3,,

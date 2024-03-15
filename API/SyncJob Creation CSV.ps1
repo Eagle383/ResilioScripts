@@ -1,5 +1,36 @@
 Add-Type -AssemblyName System.Windows.Forms
 
+# Ask the user if they want to export a CSV template
+$exportTemplate = Read-Host "Would you like to export a CSV template? (yes/no)"
+
+if ($exportTemplate.ToLower() -eq 'yes') {
+    # Initialize Save File Dialog
+    $saveFileDialog = New-Object System.Windows.Forms.SaveFileDialog
+    $saveFileDialog.InitialDirectory = [Environment]::GetFolderPath("Desktop")
+    $saveFileDialog.Filter = "CSV files (*.csv)|*.csv"
+    $saveFileDialog.FileName = "template.csv"
+    
+    $dialogResult = $saveFileDialog.ShowDialog()
+
+    if ($dialogResult -eq [System.Windows.Forms.DialogResult]::OK) {
+        # Correct CSV template content
+        $csvTemplate = "JobName,JobDescription,AgentNames,winPath,linuxPath,osxPath`r`n" +
+                       "Job 1,Description for Job 1,Agent1,C:\tmp\job1,,`r`n" +
+                       "Job 1,Description for Job 1,Agent2,C:\tmp\job1,,`r`n" +
+                       "Job 2,Description for Job 2,Agent1,C:\tmp\job2,,`r`n" +
+                       "Job 2,Description for Job 2,Agent2,C:\tmp\job2,,`r`n" +
+                       "Job 3,Description for Job 3,Agent1,C:\tmp\job3,,`r`n" +
+                       "Job 3,Description for Job 3,Agent2,C:\tmp\job3,,"
+
+        # Export the template CSV
+        $csvTemplate | Out-File -FilePath $saveFileDialog.FileName -Force
+        Write-Host "CSV template exported to $($saveFileDialog.FileName)"
+    }
+    
+    # Exit the script
+    exit
+}
+
 # Configure OpenFileDialog
 $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
 $openFileDialog.InitialDirectory = [Environment]::GetFolderPath("Desktop")
@@ -50,17 +81,16 @@ if (-not [string]::IsNullOrWhiteSpace($csvPath)) {
             $agent = $agent_list | Where-Object { $_.name -eq $agentName }
 
             if ($agent) {
-                $linuxPath = ""
-                $windowsPath = $entry.winPath
-                $macPath = ""
+                $winPath = $entry.winPath
+                $linuxPath = $entry.linuxPath
+                $osxPath = $entry.osxPath
 
                 $selectedAgents += [PSCustomObject]@{
                     id = $agent.id
-                    permission = "rw"
                     path = @{
                         linux = $linuxPath
-                        win = $windowsPath
-                        osx = $macPath
+                        win = $winPath
+                        osx = $osxPath
                     }
                 }
             } else {
@@ -79,11 +109,16 @@ if (-not [string]::IsNullOrWhiteSpace($csvPath)) {
 
         $JSON = $JobObject | ConvertTo-Json -Depth 10
 
+        # Check and create C:\tmp directory if it doesn't exist
+        if (-not (Test-Path -Path 'C:\tmp')) {
+            New-Item -ItemType Directory -Path 'C:\tmp'
+        }
+
         # Invoke job creation API call
         try {
             $response = Invoke-RestMethod -Method "POST" -Uri "$base_url/jobs" -Headers $http_headers -ContentType "Application/json" -Body $JSON
             $responseJson = $response | ConvertTo-Json -Depth 10
-            $responsePath = "C:\Users\eagle\OneDrive\Documents\GitHub\ResilioScripts\API\$($jobName).json"
+            $responsePath = "C:\tmp\$($jobName).json"
             $responseJson | Out-File -FilePath $responsePath -Force
             Write-Host "Job '$jobName' created successfully. Response saved to $responsePath"
         } catch {
