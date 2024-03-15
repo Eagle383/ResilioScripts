@@ -45,22 +45,10 @@ if ($importCSV.ToLower() -eq 'yes') {
         $MCHost = Read-Host "Please enter the Management Console host (including https:// and port)"
         $APIToken = Read-Host "Please enter your API token"
 
-        # Prompt user to select the job type
-        $jobTypes = @("consolidation", "distribution", "script", "sync") | Sort-Object
-        Write-Host "Select the job type by entering the corresponding number:"
-        $jobTypes.ForEach({
-            $index = [Array]::IndexOf($jobTypes, $_) + 1
-            Write-Host "${index}: $_"
-        })
-        [int]$jobTypeSelection = Read-Host "Enter number"
-        while ($jobTypeSelection -lt 1 -or $jobTypeSelection -gt $jobTypes.Length) {
-            Write-Host "Invalid selection. Please enter a number between 1 and $($jobTypes.Length)."
-            [int]$jobTypeSelection = Read-Host "Enter number"
-        }
-        $jobType = $jobTypes[$jobTypeSelection - 1]
+        # Fetch the list of all job profiles from the API
+        $jobProfiles = Invoke-RestMethod -Method GET -Uri "$MCHost/api/v2/job_profiles" -Headers @{ "Authorization" = "Token $APIToken" }
 
         # Prompt user to select the job profile
-        $jobProfiles = Invoke-RestMethod -Method GET -Uri "$MCHost/api/v2/job_profiles" -Headers @{ "Authorization" = "Token $APIToken" }
         Write-Host "Please select a job profile by entering the corresponding number:"
         for ($i = 0; $i -lt $jobProfiles.Count; $i++) {
             Write-Host "$($i + 1): $($jobProfiles[$i].name)"
@@ -70,7 +58,21 @@ if ($importCSV.ToLower() -eq 'yes') {
             Write-Host "Invalid selection. Please enter a number between 1 and $($jobProfiles.Count)."
             [int]$profileNumber = Read-Host "Enter number"
         }
-        $profileID = $jobProfiles[$profileNumber - 1].id
+        $selectedProfile = $jobProfiles[$profileNumber - 1]
+
+        # Determine if reference agent is needed based on job profile settings
+        $referenceAgentID = $null
+        if ($selectedProfile.settings.windows_fs_acl_mode -ne 0 -or $selectedProfile.settings.posix_fs_acl_mode -ne 0) {
+            # Fetch agent ID based on agent name
+            $referenceAgentName = Read-Host "Please enter the reference agent computer name"
+            $agentList = Invoke-RestMethod -Method GET -Uri "$MCHost/api/v2/agents" -Headers @{ "Authorization" = "Token $APIToken" }
+            $referenceAgent = $agentList | Where-Object { $_.name -eq $referenceAgentName }
+            if ($referenceAgent) {
+                $referenceAgentID = $referenceAgent.id
+            } else {
+                Write-Host "Reference agent '$referenceAgentName' not found."
+            }
+        }
 
         # Define base URL and headers for API requests using "Token" for authorization
         $base_url = "$MCHost/api/v2"
@@ -109,19 +111,26 @@ if ($importCSV.ToLower() -eq 'yes') {
                 }
             }
 
+            # Remove the 'groups' section for sync jobs and add agents directly
             $JobObject = @{
                 name = $jobName
                 description = $jobDescription
-                type = $jobType
+                type = $selectedProfile.type
                 agents = $agents
                 use_new_cipher = $false
                 settings = @{
                     priority = 5
                     use_ram_optimization = $true
                 }
-                profile_id = $profileID
+                profile_id = $selectedProfile.id
             }
 
+            # If reference agent is needed, add it to the job object
+            if ($referenceAgentID) {
+                $JobObject.settings.reference_agent_id = $referenceAgentID
+            }
+
+            # Convert job object to JSON
             $JSON = $JobObject | ConvertTo-Json -Depth 10
 
             # Check and create C:\tmp directory if it doesn't exist
@@ -129,11 +138,16 @@ if ($importCSV.ToLower() -eq 'yes') {
                 New-Item -ItemType Directory -Path 'C:\tmp'
             }
 
+            # Export the job JSON to a file
+            $jsonFilePath = "C:\tmp\$($jobName).json"
+            $JSON | Out-File -FilePath $jsonFilePath -Force
+            Write-Host "Job '$jobName' JSON exported to $jsonFilePath"
+
             # Invoke job creation API call
             try {
                 $response = Invoke-RestMethod -Method "POST" -Uri "$base_url/jobs" -Headers $http_headers -ContentType "Application/json" -Body $JSON
                 $responseJson = $response | ConvertTo-Json -Depth 10
-                $responsePath = "C:\tmp\$($jobName).json"
+                $responsePath = "C:\tmp\$($jobName)_response.json"
                 $responseJson | Out-File -FilePath $responsePath -Force
                 Write-Host "Job '$jobName' created successfully. Response saved to $responsePath"
             } catch {
@@ -141,8 +155,8 @@ if ($importCSV.ToLower() -eq 'yes') {
             }
         }
     } else {
-        Write-Host "CSV file selection was cancelled."
+        Write-Host "No CSV file was selected."
     }
 } else {
-    Write-Host "Importing a CSV file was skipped."
+    Write-Host "Exporting a CSV template was skipped."
 }
