@@ -45,10 +45,22 @@ if ($importCSV.ToLower() -eq 'yes') {
         $MCHost = Read-Host "Please enter the Management Console host (including https:// and port)"
         $APIToken = Read-Host "Please enter your API token"
 
-        # Fetch the list of all job profiles from the API
-        $jobProfiles = Invoke-RestMethod -Method GET -Uri "$MCHost/api/v2/job_profiles" -Headers @{ "Authorization" = "Token $APIToken" }
+        # Prompt user to select the job type
+        $jobTypes = @("consolidation", "distribution", "script", "sync") | Sort-Object
+        Write-Host "Select the job type by entering the corresponding number:"
+        $jobTypes.ForEach({
+            $index = [Array]::IndexOf($jobTypes, $_) + 1
+            Write-Host "${index}: $_"
+        })
+        [int]$jobTypeSelection = Read-Host "Enter number"
+        while ($jobTypeSelection -lt 1 -or $jobTypeSelection -gt $jobTypes.Length) {
+            Write-Host "Invalid selection. Please enter a number between 1 and $($jobTypes.Length)."
+            [int]$jobTypeSelection = Read-Host "Enter number"
+        }
+        $jobType = $jobTypes[$jobTypeSelection - 1]
 
         # Prompt user to select the job profile
+        $jobProfiles = Invoke-RestMethod -Method GET -Uri "$MCHost/api/v2/job_profiles" -Headers @{ "Authorization" = "Token $APIToken" }
         Write-Host "Please select a job profile by entering the corresponding number:"
         for ($i = 0; $i -lt $jobProfiles.Count; $i++) {
             Write-Host "$($i + 1): $($jobProfiles[$i].name)"
@@ -60,9 +72,11 @@ if ($importCSV.ToLower() -eq 'yes') {
         }
         $selectedProfile = $jobProfiles[$profileNumber - 1]
 
-        # Determine if reference agent is needed based on job profile settings
+        # Analyze profile settings to determine if reference agent is needed
+        $profileSettings = $selectedProfile.settings
         $referenceAgentID = $null
-        if ($selectedProfile.settings.windows_fs_acl_mode -ne 0 -or $selectedProfile.settings.posix_fs_acl_mode -ne 0) {
+        if ($profileSettings -and ($profileSettings.windows_fs_acl_mode -ne $null -or $profileSettings.posix_fs_acl_mode -ne $null) -and
+            ($profileSettings.windows_fs_acl_mode -ne 0 -or $profileSettings.posix_fs_acl_mode -ne 0)) {
             # Fetch agent ID based on agent name
             $referenceAgentName = Read-Host "Please enter the reference agent computer name"
             $agentList = Invoke-RestMethod -Method GET -Uri "$MCHost/api/v2/agents" -Headers @{ "Authorization" = "Token $APIToken" }
@@ -115,19 +129,15 @@ if ($importCSV.ToLower() -eq 'yes') {
             $JobObject = @{
                 name = $jobName
                 description = $jobDescription
-                type = $selectedProfile.type
+                type = $jobType
                 agents = $agents
                 use_new_cipher = $false
                 settings = @{
                     priority = 5
                     use_ram_optimization = $true
+                    reference_agent_id = $referenceAgentID
                 }
                 profile_id = $selectedProfile.id
-            }
-
-            # If reference agent is needed, add it to the job object
-            if ($referenceAgentID) {
-                $JobObject.settings.reference_agent_id = $referenceAgentID
             }
 
             # Convert job object to JSON
