@@ -1,7 +1,7 @@
-JobName,JobDescription,AgentNames,Permission,winPath,linuxPath,osxPath
-Dist Job 1,,OMV,rw,,/srv/dev-disk-by-uuid-df9e82b1-1c0d-418c-8052-81be44380e97/FARMNAS/Source/Job1,
-Dist Job 1,,DESKTOP-PIS4UUO,ro,D:\Staging,,
-Dist Job 2,,OMV,rw,,/srv/dev-disk-by-uuid-df9e82b1-1c0d-418c-8052-81be44380e97/FARMNAS/Source/Job2,
-Dist Job 2,,DESKTOP-PIS4UUO,ro,D:\Staging,,
-Dist Job 3,,OMV,rw,,/srv/dev-disk-by-uuid-df9e82b1-1c0d-418c-8052-81be44380e97/FARMNAS/Source/Job3,
-Dist Job 3,,DESKTOP-PIS4UUO,ro,D:\Staging,,
+JobName,JobDescription,AgentNames,Permission,winPath,linuxPath,osxPath,JobType
+Dist Job 1,,OMV,rw,,/srv/dev-disk-by-uuid-df9e82b1-1c0d-418c-8052-81be44380e97/FARMNAS/Source/Job1,,distribution
+Dist Job 1,,DESKTOP-PIS4UUO,ro,D:\Staging,,,distribution
+Dist Job 2,,OMV,rw,,/srv/dev-disk-by-uuid-df9e82b1-1c0d-418c-8052-81be44380e97/FARMNAS/Source/Job2,,distribution
+Dist Job 2,,DESKTOP-PIS4UUO,ro,D:\Staging,,,distribution
+Dist Job 3,,OMV,rw,,/srv/dev-disk-by-uuid-df9e82b1-1c0d-418c-8052-81be44380e97/FARMNAS/Source/Job3,,distribution
+Dist Job 3,,DESKTOP-PIS4UUO,ro,D:\Staging,,,distribution

@@ -1,5 +1,5 @@
 # Define the path to the directory
-$directoryPath = "D:\Staging\dump"
+$directoryPath = ""
 
 # Get the current date
 $currentDate = Get-Date
