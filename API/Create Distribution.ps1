@@ -18,9 +18,9 @@ add-type @"
 
 # Hardcoded importCSV, MCHost, APIToken, and csvPath
 $importCSV = "yes"
-$MCHost = "https://192.168.2.8:8446"
-$APIToken = "NL2X6L25T46FYAAMZOXUQVRQCDJ7DTXQOCOVUT3RALHDV4NMOG4Q"
-$csvPath = "C:\Users\eagle\OneDrive\Documents\GitHub\ResilioScripts\API\Dist_Job_template.csv"
+$MCHost = "https://:8446"
+$APIToken = ""
+$csvPath = ""
 $outputPath = "C:\TMP"  # Output path for JSON responses
 
 # Hardcoded scheduler variables
