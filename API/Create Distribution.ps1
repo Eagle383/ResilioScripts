@@ -142,7 +142,6 @@ if ($importCSV.ToLower() -eq 'yes') {
                 }
             }
 
-            # Remove the 'groups' section for sync jobs and add agents directly
             $JobObject = @{
                 name = $jobName
                 description = $jobDescription
